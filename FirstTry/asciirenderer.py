@@ -1,5 +1,4 @@
 import sys
-
 class ASCIIRenderer(object):
     ''' Graphics engine - writes to console '''
     # Realllly primitive graphics

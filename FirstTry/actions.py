@@ -18,28 +18,21 @@ class Move(Action):
         self.direction = direction
 
     def execute(self):
-        flatten = self.game.flatten
-
+        world = self.game.world
         if not self.actor:
             raise NameError('No actor bound to action %s', str(self))
 
         # Get the place the entity is trying to move into
         final_pos = self.actor.pos + self.direction
-        grid = self.game.world[final_pos.z % self.game.dim_z]
-        tile = grid[flatten(final_pos)]
-
-        # These can access out of bounds, so they're calculated modulo
-        # the game's height– this makes them wrap around
-        ceiling = self.game.world[(final_pos.z+1) % self.game.dim_z]
-        floor = self.game.world[(final_pos.z-1) % self.game.dim_z]
+        tile = world.get(final_pos)
 
         # If there are no walls around the player, keep drifting in direction
-        if ((grid[flatten(final_pos + N)] is empty_space) and
-            (grid[flatten(final_pos + S)] is empty_space) and
-            (grid[flatten(final_pos + E)] is empty_space) and
-            (grid[flatten(final_pos + W)] is empty_space) and
-            (floor[flatten(final_pos)] is empty_space) and
-            (ceiling[flatten(final_pos)] is empty_space)):
+        if ((world.get(final_pos + N) is empty_space) and
+            (world.get(final_pos + S) is empty_space) and
+            (world.get(final_pos + E) is empty_space) and
+            (world.get(final_pos + W) is empty_space) and
+            (world.get(final_pos + UP) is empty_space) and
+            (world.get(final_pos + DN) is empty_space)):
 
             # Set next action
             self.actor.next_action = Drift(self.direction)
@@ -51,7 +44,6 @@ class Move(Action):
             return SUCCESS
 
         elif tile is dirt_block:
-
             alternate_action = Dig(self.direction)
             alternate_action.bind(self.actor)
             return alternate_action.execute()
@@ -69,24 +61,18 @@ class Dig(Action):
         self.direction = direction
 
     def execute(self):
-        flatten = self.game.flatten
+        world = self.game.world
 
         if not self.actor:
             raise NameError('No actor bound to action %s', str(self))
 
         # Get the place the entity is trying to move into
         final_pos = self.actor.pos + self.direction
-        grid = self.game.world[final_pos.z]
-        tile = grid[flatten(final_pos)]
-
-        # These can access out of bounds, so they're calculated modulo
-        # the game's height– this makes them wrap around
-        ceiling = self.game.world[(final_pos.z+1)%self.game.dim_z]
-        floor = self.game.world[(final_pos.z-1)%self.game.dim_z]
+        tile = world.get(final_pos)
 
         if tile is dirt_block:
+            self.game.world.set(final_pos, empty_space)
             self.actor.pos = final_pos
-            grid[flatten(final_pos)] = empty_space
             return SUCCESS
 
         else: 

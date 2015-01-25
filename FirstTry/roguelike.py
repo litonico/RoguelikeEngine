@@ -3,13 +3,23 @@ from entities import Entity, Hero
 from tiles import *
 from asciirenderer import ASCIIRenderer
 
+class World(object):
+    def __init__(self, dim_x, dim_y, dim_z):
+        self.tiles = [[[dirt_block for z in range(dim_z)] 
+                                        for y in range(dim_y)] 
+                                            for x in range(dim_x)]
+
+    def get(self, pos):
+        return self.tiles[pos.x][pos.y][pos.z]
+
+    def set(self, pos, tiletype):
+        self.tiles[pos.x][pos.y][pos.z] = tiletype
+
 class Game(object):
     '''Args: the dimensions (x, y, z) of the map'''
     def __init__(self, dim_x, dim_y, dim_z):
         self.dim_x, self.dim_y, self.dim_z = dim_x, dim_y, dim_z
-        self.world = [
-                [dirt_block for i in range(dim_x*dim_y)] for j in range(dim_z)]
-
+        self.world = World(dim_x, dim_y, dim_z)
         self.hero = Hero(self,
                         'hero',
                         '@',
