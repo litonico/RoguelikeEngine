@@ -1,6 +1,8 @@
 require './array'
 
 class Coords
+  # Wrapper around coordinates (for entities and items) so they can be 
+  # accessed with dot-operations.
   attr_accessor :x, :y, :z
 
   def initialize x, y, z
@@ -15,7 +17,7 @@ end
 #   "rock"
 # ]
 
-DIFFUSION_SPEED = 0.01
+DIFFUSION_SPEED = 0.5
 
 class Tile
   def initialize background_gas, concentration, material
@@ -32,14 +34,18 @@ class Tile
   end
 
   def diffuse_into neighbor
-    this_total_gas = self.background_gas.values.fold(:+)
-    neighbor_total_gas = neighbor.background_gas.values.fold(:+)
-    difference = this_total_gas - neighbor_total_gas
+    unless neighbor.material == "empty"
+      this_total_gas = self.background_gas.values.reduce(:+)
+      neighbor_total_gas = neighbor.background_gas.values.reduce(:+)
+      difference = this_total_gas - neighbor_total_gas
 
-    amount = difference/2 * DIFFUSION_SPEED
-    for gas in self.background_gas.keys
-      self.background_gas[gas] -= amount
-      neighbor[gas] += amount
+      # TODO: check for NaNs when total_gas is 0
+      amount = (difference/2) * DIFFUSION_SPEED
+      for gas in @background_gas.keys
+        @background_gas[gas] -= (amount/this_total_gas)*@background_gas[gas]
+        neighbor.background_gas[gas] += (amount/neighbor_total_gas) \
+                                        *neighbor.background_gas[gas]
+      end
     end
   end
 
@@ -66,64 +72,34 @@ class World
 
   def initialize dim_x, dim_y, dim_z
     @map = Array3D.new dim_x, dim_y, dim_z
-    @map.set_uniform! Tile.new "air", 100, "empty"
+    @map.set_uniform! do
+      Tile.new "air", 10, "empty"
+    end
   end
 
   def diffuse
-    # TODO: This is a guess at a less slow way to do this.
+    # TODO: This just is a guess at a less dumb way to do this.
     # Move through the array in steps of two, diffusing in to the
     # 26 surrounding cells, so each cell only takes its 
     # neighbor's contributions.
+    dim_x, dim_y, dim_z = @map.dim_x, @map.dim_y, @map.dim_z
 
-    (0...@map.dim_x).step(2) do |x|
-      (0...@map.dim_y).step(2) do |y|
-        (0...@map.dim_z).step(2) do |z|
-          # Back
-          if x != 0
-            @map[x, y, z].diffuse_into @map[x-1, y, z]
-            @map[x, y, z].diffuse_into @map[x-1, y, z+1]
-            @map[x, y, z].diffuse_into @map[x-1, y+1, z]
-            @map[x, y, z].diffuse_into @map[x-1, y+1, z+1]
-          end
+    (0...dim_x).step(2) do |g_x|
+      (0...dim_y).step(2) do |g_y|
+        (0...dim_z).step(2) do |g_z|
 
-          # Front
-          if x != dim_x
-            @map[x, y, z].diffuse_into @map[x+1, y, z]
-            @map[x, y, z].diffuse_into @map[x+1, y, z+1]
-            @map[x, y, z].diffuse_into @map[x+1, y+1, z]
-            @map[x, y, z].diffuse_into @map[x+1, y+1, z+1]
-          end
-          
-          # Top
-          if y != dim_y
-            @map[x, y, z].diffuse_into @map[x, y-1, z]
-            @map[x, y, z].diffuse_into @map[x, y-1, z+1]
-            @map[x, y, z].diffuse_into @map[x+1, y-1, z]
-            @map[x, y, z].diffuse_into @map[x+1, y-1, z+1]
-          end
+          xs = [g_x-1, g_x, g_x+1].select {|i| i >= 0 && i < dim_x}
+          ys = [g_y-1, g_y, g_y+1].select {|i| i >= 0 && i < dim_y}
+          zs = [g_z-1, g_z, g_z+1].select {|i| i >= 0 && i < dim_z}
 
-          # Bottom
-          if y != dim_y
-            @map[x, y, z].diffuse_into @map[x, y+1, z]
-            @map[x, y, z].diffuse_into @map[x, y+1, z+1]
-            @map[x, y, z].diffuse_into @map[x+1, y+1, z]
-            @map[x, y, z].diffuse_into @map[x+1, y+1, z+1]
-          end
-
-          # Left
-          if y != dim_y
-            @map[x, y, z].diffuse_into @map[x, y, z-1]
-            @map[x, y, z].diffuse_into @map[x, y-1, z-1]
-            @map[x, y, z].diffuse_into @map[x+1, y, z-1]
-            @map[x, y, z].diffuse_into @map[x+1, y-1, z-1]
-          end
-
-          # Right
-          if y != dim_y
-            @map[x, y, z].diffuse_into @map[x, y, z+1]
-            @map[x, y, z].diffuse_into @map[x, y-1, z+1]
-            @map[x, y, z].diffuse_into @map[x+1, y, z+1]
-            @map[x, y, z].diffuse_into @map[x+1, y-1, z+1]
+          xs.each do |x|
+            ys.each do |y|
+              zs.each do |z|
+                # TODO: Each tile first tries to diffuse into itself.
+                # This isn't a problem really, but could be fixed.
+                @map[g_x, g_y, g_z].diffuse_into @map[x, y, z]
+              end
+            end
           end
 
         end
@@ -137,9 +113,10 @@ class Game
   # @actors = []
   def initialize
     @entities = []
-    @world = World.new 10, 10, 10
-    @hero = Entity.new 0, 0, 0
     @current_entity = 0
+    @hero = Entity.new 0, 0, 0
+    @world = World.new 5, 7, 1
+    @world.map[0,0,0] = Tile.new "air", 100, "empty"
   end
 
   def step
@@ -156,10 +133,48 @@ class ASCII_ui
     @game = Game.new
   end
 
+  def color text, color
+    colors = {
+      'black' => "\033[0m" ,
+      'grey'  => "\033[90m",
+      'red'   => "\033[91m",
+      'green' => "\033[92m",
+      'yellow'=> "\033[93m",
+      'blue'  => "\033[94m",
+      'purple'=> "\033[95m",
+      'cyan'  => "\033[96m",
+      'white' => "\033[97m",
+      }
+
+    #TODO: It's more complicated than this...
+    neutral = colors['black']
+
+    colors[color] + text + neutral
+  end
+  
+  def clear
+    print "\x1b[2J\x1b[H"
+  end
+
   def render!
     # Draw the current level, as well as ones on z-levels above and below it.
-    current_z = @game.hero.pos.z
+    z = @game.hero.pos.z
+    self.render_slice! z
 
+    # TODO: To draw the level above and below the player
+    #zs = [z-1, z, z+1].select {|i| i >= 0 && i < @game.world.map.dim_x}
+    # zs.each do |level|
+    #   self.render_slice! level
+    #   puts "\n"
+    #   puts level
+    # end
+
+    gets
+    self.clear
+  end
+
+  def render_slice! current_z
+    #TODO: Base this on view distance, not map size
     map = @game.world.map
     (0...map.dim_x).each do |x|
       (0...map.dim_y).each do |y|
@@ -175,18 +190,22 @@ class ASCII_ui
   end
 
   def draw_background tile
-    if tile.background_gas["air"] > 30
-      return '#'
+    if tile.background_gas["air"] > 60
+      return color('#', 'blue')
+    elsif tile.background_gas["air"] > 12
+      return color('#', 'cyan')
     else
-      return '.'
+      return color('.', 'grey')
     end
   end
 end
 
 def main
   ui = ASCII_ui.new
-  ui.render!
-  ui.step
+  (1..25).each do 
+    ui.render!
+    ui.step
+  end
 end
 
 main

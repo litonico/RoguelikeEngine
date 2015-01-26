@@ -21,11 +21,11 @@ class Array3D
     @contents[x][y][z] = val
   end
 
-  def set_uniform! val
+  def set_uniform! &val
     (0...@dim_x).each do |x|
       (0...@dim_y).each do |y|
         (0...@dim_z).each do |z|
-          @contents[x][y][z] = val
+          @contents[x][y][z] = val.call
         end
       end
     end
