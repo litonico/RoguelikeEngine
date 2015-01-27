@@ -34,7 +34,7 @@ class Tile
   end
 
   def diffuse_into neighbor
-    unless neighbor.material == "empty"
+    if neighbor.material == "empty"
       this_total_gas = self.background_gas.values.reduce(:+)
       neighbor_total_gas = neighbor.background_gas.values.reduce(:+)
       difference = this_total_gas - neighbor_total_gas
