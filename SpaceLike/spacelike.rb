@@ -39,12 +39,20 @@ class Tile
       neighbor_total_gas = neighbor.background_gas.values.reduce(:+)
       difference = this_total_gas - neighbor_total_gas
 
-      # TODO: check for NaNs when total_gas is 0
       amount = (difference/2) * DIFFUSION_SPEED
+
       for gas in @background_gas.keys
-        @background_gas[gas] -= (amount/this_total_gas)*@background_gas[gas]
-        neighbor.background_gas[gas] += (amount/neighbor_total_gas) \
-                                        *neighbor.background_gas[gas]
+        # `amount` is the total amount of gas moving from one tile to the 
+        # other, so we distribute that amount among all the tile's gases.
+        # In the case that either of the `total_gas`es is 0, no gas flows
+        # *from* that tile. This also saves us from div/0 errors!
+        if this_total_gas != 0
+          @background_gas[gas] -= (amount/this_total_gas)*@background_gas[gas]
+        end
+        if neighbor_total_gas != 0
+          neighbor.background_gas[gas] += (amount/neighbor_total_gas) \
+                                          *neighbor.background_gas[gas]
+        end
       end
     end
   end
