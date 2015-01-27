@@ -73,6 +73,11 @@ class Entity
 end
 
 class Hero < Entity
+  attr_accessor :view_dist
+  def initialize x, y, z
+    super(x, y, z)
+    @view_dist = 10
+  end
 end
 
 class World
@@ -122,7 +127,7 @@ class Game
   def initialize
     @entities = []
     @current_entity = 0
-    @hero = Entity.new 0, 0, 0
+    @hero = Hero.new 3, 4, 0
     @world = World.new 5, 7, 1
     @world.map[0,0,0] = Tile.new "air", 100, "empty"
   end
@@ -170,7 +175,7 @@ class ASCII_ui
     self.render_slice! z
 
     # TODO: To draw the level above and below the player
-    #zs = [z-1, z, z+1].select {|i| i >= 0 && i < @game.world.map.dim_x}
+    # zs = [z-1, z, z+1].select {|i| i >= 0 && i < @game.world.map.dim_x}
     # zs.each do |level|
     #   self.render_slice! level
     #   puts "\n"
@@ -184,12 +189,21 @@ class ASCII_ui
   def render_slice! current_z
     #TODO: Base this on view distance, not map size
     map = @game.world.map
-    (0...map.dim_x).each do |x|
-      (0...map.dim_y).each do |y|
-        # Check if entities on that level
-        print self.draw_background map[x, y, current_z]
+    hero = @game.hero
+
+    x_view_range = (hero.pos.x-hero.view_dist...hero.pos.x+hero.view_dist)
+    y_view_range = (hero.pos.y-hero.view_dist...hero.pos.y+hero.view_dist)
+
+    x_view_range.each do |x|
+      unless x < 0 || x >= map.dim_x
+        y_view_range.each do |y|
+          unless y < 0 || y >= map.dim_y
+            # TODO: Check if entities on that level
+            print self.draw_background map[x, y, current_z]
+          end
+        end
+        print "\n"
       end
-      print "\n"
     end
   end
 
